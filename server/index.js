@@ -4,6 +4,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import searchRouter from './routes/search.js';
+import favoritesRouter from './routes/favorites.js';
+import historyRouter from './routes/history.js';
+import playlistsRouter from './routes/playlists.js';
+import { checkDbConnection } from './db/index.js';
 
 // Load environment variables from .env
 dotenv.config();
@@ -13,7 +17,6 @@ const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // 1. Security Headers (Helmet)
-// Configured to permit YouTube embedded player iframes and cross-origin resource requests
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -26,9 +29,7 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, or same-origin)
       if (!origin) return callback(null, true);
-      // Allow localhost Vite dev server or configured CLIENT_URL
       if (
         origin === CLIENT_URL ||
         origin === 'http://localhost:5173' ||
@@ -36,9 +37,9 @@ app.use(
       ) {
         return callback(null, true);
       }
-      return callback(null, true); // Permissive for local development
+      return callback(null, true);
     },
-    methods: ['GET', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
@@ -48,8 +49,8 @@ app.use(express.json());
 
 // 4. Rate Limiting (100 requests per 15 minutes)
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -60,8 +61,10 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 
-// 5. Health Check Endpoint
-app.get('/api/health', (req, res) => {
+// 5. Health Check Endpoint (Includes PostgreSQL status)
+app.get('/api/health', async (req, res) => {
+  const dbStatus = await checkDbConnection();
+
   res.status(200).json({
     status: 'ok',
     uptime: process.uptime(),
@@ -70,11 +73,20 @@ app.get('/api/health', (req, res) => {
       process.env.YOUTUBE_API_KEY &&
       process.env.YOUTUBE_API_KEY !== 'your_youtube_api_key_here'
     ),
+    database: {
+      connected: dbStatus.ok,
+      ...(dbStatus.ok
+        ? { database: dbStatus.database, time: dbStatus.timestamp }
+        : { error: dbStatus.error, hint: 'Run `npm run db:init` after setting PGPASSWORD in server/.env' }),
+    },
   });
 });
 
-// 6. Search Routes
+// 6. Application Routes
 app.use('/api/search', searchRouter);
+app.use('/api/favorites', favoritesRouter);
+app.use('/api/history', historyRouter);
+app.use('/api/playlists', playlistsRouter);
 
 // 7. 404 Route Handler
 app.use((req, res) => {
@@ -100,16 +112,27 @@ app.use((err, req, res, next) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`===============================================`);
   console.log(`🎵 BeatStream Music API running on port ${PORT}`);
   console.log(`📡 URL: http://localhost:${PORT}/api/search`);
   console.log(`💓 Health: http://localhost:${PORT}/api/health`);
+
+  // YouTube API Check
   if (!process.env.YOUTUBE_API_KEY || process.env.YOUTUBE_API_KEY === 'your_youtube_api_key_here') {
     console.warn(`⚠️  WARNING: YOUTUBE_API_KEY is not set in server/.env.`);
     console.warn(`   Get one from https://console.cloud.google.com/apis/credentials`);
   } else {
     console.log(`🔑 YouTube API key detected.`);
+  }
+
+  // Database Connection Check
+  const dbStatus = await checkDbConnection();
+  if (dbStatus.ok) {
+    console.log(`🐘 PostgreSQL connected: ${dbStatus.database}`);
+  } else {
+    console.warn(`⚠️  PostgreSQL not connected (${dbStatus.error}).`);
+    console.warn(`   To connect: set PGPASSWORD in server/.env, then run: npm run db:init`);
   }
   console.log(`===============================================`);
 });

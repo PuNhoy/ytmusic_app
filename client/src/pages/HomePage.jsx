@@ -5,7 +5,13 @@ import SearchHistory from '../components/SearchHistory';
 import VideoGrid from '../components/VideoGrid';
 import { SkeletonGrid } from '../components/SkeletonCard';
 import ErrorAlert from '../components/ErrorAlert';
-import { searchSongs } from '../utils/api';
+import {
+  searchSongs,
+  getDbHistory,
+  addDbHistory,
+  removeDbHistoryItem,
+  clearDbHistory,
+} from '../utils/api';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const POPULAR_SUGGESTIONS = [
@@ -26,8 +32,30 @@ export default function HomePage() {
   const [error, setError] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Search history persisted in localStorage
-  const [history, setHistory] = useLocalStorage('beatstream_search_history', []);
+  // Search history state, synced with PostgreSQL & backed by localStorage
+  const [localHistory, setLocalHistory] = useLocalStorage('beatstream_search_history', []);
+  const [history, setHistory] = useState(localHistory);
+
+  // Sync recent searches from PostgreSQL on load
+  useEffect(() => {
+    let isMounted = true;
+    async function loadHistory() {
+      try {
+        const dbItems = await getDbHistory();
+        if (isMounted && Array.isArray(dbItems) && dbItems.length > 0) {
+          setHistory(dbItems);
+          setLocalHistory(dbItems);
+        }
+      } catch (err) {
+        // Fallback to local storage if DB is not yet initialized
+        if (isMounted) setHistory(localHistory);
+      }
+    }
+    loadHistory();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const executeSearch = async (searchTerm, pageToken = null) => {
     if (!searchTerm || !searchTerm.trim()) return;
@@ -48,13 +76,17 @@ export default function HomePage() {
       } else {
         setResults(data.items || []);
         setHasSearched(true);
-        // Save to search history (max 10 items, no duplicates, placed at front)
-        setHistory((prev) => {
-          const filtered = prev.filter(
-            (item) => item.toLowerCase() !== searchTerm.toLowerCase()
-          );
-          return [searchTerm, ...filtered].slice(0, 10);
-        });
+
+        // Update local search history
+        const filtered = history.filter(
+          (item) => item.toLowerCase() !== searchTerm.toLowerCase()
+        );
+        const updated = [searchTerm, ...filtered].slice(0, 10);
+        setHistory(updated);
+        setLocalHistory(updated);
+
+        // Persist to PostgreSQL in background
+        addDbHistory(searchTerm).catch(() => {});
       }
 
       setNextPageToken(data.nextPageToken || null);
@@ -78,11 +110,18 @@ export default function HomePage() {
   };
 
   const handleRemoveHistoryItem = (itemToRemove) => {
-    setHistory((prev) => prev.filter((item) => item !== itemToRemove));
+    setHistory((prev) => {
+      const updated = prev.filter((item) => item !== itemToRemove);
+      setLocalHistory(updated);
+      return updated;
+    });
+    removeDbHistoryItem(itemToRemove).catch(() => {});
   };
 
   const handleClearHistory = () => {
     setHistory([]);
+    setLocalHistory([]);
+    clearDbHistory().catch(() => {});
   };
 
   return (

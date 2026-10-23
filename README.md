@@ -101,15 +101,23 @@ Inside `server/.env`:
 PORT=5000
 YOUTUBE_API_KEY=your_actual_youtube_api_key_here
 CLIENT_URL=http://localhost:5173
+
+# PostgreSQL Database Configuration
+PGHOST=localhost
+PGPORT=5432
+PGUSER=postgres
+PGPASSWORD=your_postgres_password_here
+PGDATABASE=beatstream_db
 ```
 
-*(Optional)* Inside `client/.env`:
-```env
-# Leave empty during local development; Vite dev proxy routes /api to http://localhost:5000 automatically.
-VITE_API_BASE_URL=
+### 3. Initialize the PostgreSQL Database
+Run the automated schema & database creation script:
+```bash
+npm run db:init
 ```
+*(This automatically creates `beatstream_db`, all tables, indexes, and seed records!)*
 
-### 3. Run the Development Server
+### 4. Run the Development Server
 From the root directory, start both the backend server and the frontend client simultaneously:
 ```bash
 npm run dev
