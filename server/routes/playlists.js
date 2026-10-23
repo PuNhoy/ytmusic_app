@@ -10,7 +10,7 @@ const DEFAULT_USER_ID = 1;
  */
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     const result = await query(
       `SELECT p.id, p.name, p.description, p.created_at AS "createdAt",
@@ -38,7 +38,7 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { name, description } = req.body;
-    const userId = req.body.userId ? parseInt(req.body.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.body.userId ? parseInt(req.body.userId, 10) : DEFAULT_USER_ID);
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -70,7 +70,7 @@ router.post('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     const playlistRes = await query(
       `SELECT id, name, description, created_at AS "createdAt"
@@ -193,7 +193,7 @@ router.delete('/:id/tracks/:videoId', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     const result = await query(
       `DELETE FROM playlists WHERE id = $1 AND user_id = $2 RETURNING id`,

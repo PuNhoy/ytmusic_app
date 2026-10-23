@@ -10,7 +10,7 @@ const DEFAULT_USER_ID = 1; // Default guest user
  */
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     const result = await query(
       `SELECT video_id AS "videoId", title, channel, thumbnail, duration, duration_seconds AS "durationSeconds", created_at AS "createdAt"
@@ -36,7 +36,7 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { videoId, title, channel, thumbnail, duration, durationSeconds } = req.body;
-    const userId = req.body.userId ? parseInt(req.body.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.body.userId ? parseInt(req.body.userId, 10) : DEFAULT_USER_ID);
 
     if (!videoId || !title) {
       return res.status(400).json({
@@ -80,7 +80,7 @@ router.post('/', async (req, res, next) => {
 router.delete('/:videoId', async (req, res, next) => {
   try {
     const { videoId } = req.params;
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     const result = await query(
       `DELETE FROM favorites WHERE user_id = $1 AND video_id = $2 RETURNING video_id AS "videoId"`,
@@ -108,7 +108,7 @@ router.delete('/:videoId', async (req, res, next) => {
  */
 router.delete('/', async (req, res, next) => {
   try {
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     await query(`DELETE FROM favorites WHERE user_id = $1`, [userId]);
 

@@ -3,14 +3,22 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import searchRouter from './routes/search.js';
 import favoritesRouter from './routes/favorites.js';
 import historyRouter from './routes/history.js';
 import playlistsRouter from './routes/playlists.js';
+import authRouter from './routes/auth.js';
+import { optionalAuth } from './middleware/auth.js';
 import { checkDbConnection } from './db/index.js';
 
 // Load environment variables from .env
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -83,12 +91,23 @@ app.get('/api/health', async (req, res) => {
 });
 
 // 6. Application Routes
+app.use('/api/auth', authRouter);
 app.use('/api/search', searchRouter);
-app.use('/api/favorites', favoritesRouter);
-app.use('/api/history', historyRouter);
-app.use('/api/playlists', playlistsRouter);
+app.use('/api/favorites', optionalAuth, favoritesRouter);
+app.use('/api/history', optionalAuth, historyRouter);
+app.use('/api/playlists', optionalAuth, playlistsRouter);
 
-// 7. 404 Route Handler
+// 7. Serve Static Frontend in Production (if built)
+const clientDistPath = path.resolve(__dirname, '../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
+
+// 8. 404 Route Handler (for unmatched API endpoints)
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -96,7 +115,7 @@ app.use((req, res) => {
   });
 });
 
-// 8. Global Error Handler
+// 9. Global Error Handler
 app.use((err, req, res, next) => {
   const status = err.status || 500;
   const errorTitle = err.code || (status === 500 ? 'Internal Server Error' : 'Error');

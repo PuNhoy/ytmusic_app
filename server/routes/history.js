@@ -10,7 +10,7 @@ const DEFAULT_USER_ID = 1;
  */
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     // Distinct query on latest searched_at
     const result = await query(
@@ -42,7 +42,7 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { query: searchQuery } = req.body;
-    const userId = req.body.userId ? parseInt(req.body.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.body.userId ? parseInt(req.body.userId, 10) : DEFAULT_USER_ID);
 
     if (!searchQuery || !searchQuery.trim()) {
       return res.status(400).json({
@@ -74,7 +74,7 @@ router.post('/', async (req, res, next) => {
 router.delete('/:term', async (req, res, next) => {
   try {
     const { term } = req.params;
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     await query(
       `DELETE FROM search_history WHERE user_id = $1 AND LOWER(query) = LOWER($2)`,
@@ -96,7 +96,7 @@ router.delete('/:term', async (req, res, next) => {
  */
 router.delete('/', async (req, res, next) => {
   try {
-    const userId = req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID;
+    const userId = req.user?.id || (req.query.userId ? parseInt(req.query.userId, 10) : DEFAULT_USER_ID);
 
     await query(`DELETE FROM search_history WHERE user_id = $1`, [userId]);
 
