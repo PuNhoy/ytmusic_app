@@ -1,7 +1,11 @@
+
 {
   "name": "ytmusic-app",
-  "compatibility_date": "2024-09-23",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-24",
   "assets": {
-    "directory": "./client/dist"
+    "directory": "./dist",
+    "binding": "ASSETS"
   }
 }
+
