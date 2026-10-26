@@ -12,6 +12,7 @@ export function useVoiceSearch({ onResult, onError } = {}) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState(null);
+  const [errorCode, setErrorCode] = useState(null);
 
   // Default to Khmer 'km-KH' or user's saved preference
   const [currentLang, setCurrentLangState] = useState(() => {
@@ -22,20 +23,6 @@ export function useVoiceSearch({ onResult, onError } = {}) {
   const currentLangRef = useRef(currentLang);
   currentLangRef.current = currentLang;
 
-  const setLanguage = (langCode) => {
-    setCurrentLangState(langCode);
-    currentLangRef.current = langCode;
-    localStorage.setItem('beatstream_voice_lang', langCode);
-
-    // If currently listening, restart with the new language
-    if (isListening) {
-      stopListening();
-      setTimeout(() => {
-        startListening(langCode);
-      }, 150);
-    }
-  };
-
   // Check if browser supports Web Speech API
   const isSupported =
     typeof window !== 'undefined' &&
@@ -45,9 +32,7 @@ export function useVoiceSearch({ onResult, onError } = {}) {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (err) {
-        // Ignore stop error
-      }
+      } catch (err) {}
     }
     setIsListening(false);
   }, []);
@@ -62,6 +47,7 @@ export function useVoiceSearch({ onResult, onError } = {}) {
             ? 'មុខងារស្វែងរកដោយសំឡេងមិនទាន់គាំទ្រលើ browser នេះទេ។ សូមប្រើ Google Chrome ឬ Edge។'
             : 'Voice search is not supported in this browser. Please use Chrome, Edge, or Safari.';
         setError(msg);
+        setErrorCode('not-supported');
         if (onError) onError(msg);
         return;
       }
@@ -74,6 +60,7 @@ export function useVoiceSearch({ onResult, onError } = {}) {
       }
 
       setError(null);
+      setErrorCode(null);
       setTranscript('');
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -89,6 +76,7 @@ export function useVoiceSearch({ onResult, onError } = {}) {
       recognition.onstart = () => {
         setIsListening(true);
         setError(null);
+        setErrorCode(null);
       };
 
       recognition.onresult = (event) => {
@@ -117,6 +105,7 @@ export function useVoiceSearch({ onResult, onError } = {}) {
       recognition.onerror = (event) => {
         let message = '';
         const isKm = activeLang === 'km-KH';
+        setErrorCode(event.error);
 
         if (event.error === 'not-allowed') {
           message = isKm
@@ -124,8 +113,8 @@ export function useVoiceSearch({ onResult, onError } = {}) {
             : 'Microphone access denied. Please allow microphone permission in your browser settings.';
         } else if (event.error === 'no-speech') {
           message = isKm
-            ? 'មិនបានឮសំឡេងទេ។ សូមព្យាយាមនិយាយជិត Microphone ម្តងទៀត។'
-            : 'No speech detected. Please speak closer to your microphone.';
+            ? 'មិនបានឮសំឡេងទេ។ តើអ្នកចង់និយាយជាភាសាអង់គ្លេសវិញទេ?'
+            : 'No speech detected. Did you want to speak in Khmer instead?';
         } else if (event.error === 'network') {
           message = isKm
             ? 'មានបញ្ហាភ្ជាប់បណ្តាញពេលស្តាប់សំឡេង។'
@@ -155,6 +144,26 @@ export function useVoiceSearch({ onResult, onError } = {}) {
     [isSupported, onError, onResult, stopListening]
   );
 
+  const setLanguage = useCallback(
+    (langCode, autoRestart = true) => {
+      setCurrentLangState(langCode);
+      currentLangRef.current = langCode;
+      localStorage.setItem('beatstream_voice_lang', langCode);
+
+      if (autoRestart) {
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.abort();
+          } catch (e) {}
+        }
+        setTimeout(() => {
+          startListening(langCode);
+        }, 120);
+      }
+    },
+    [startListening]
+  );
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -171,10 +180,14 @@ export function useVoiceSearch({ onResult, onError } = {}) {
     isListening,
     transcript,
     error,
+    errorCode,
     currentLang,
     setLanguage,
     startListening,
     stopListening,
-    clearError: () => setError(null),
+    clearError: () => {
+      setError(null);
+      setErrorCode(null);
+    },
   };
 }

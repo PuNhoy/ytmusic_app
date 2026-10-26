@@ -92,7 +92,28 @@ export async function searchMusic({ query, pageToken }) {
     });
 
     const searchData = searchResponse.data;
-    const rawItems = searchData.items || [];
+    let rawItems = searchData.items || [];
+
+    // Fallback: If 0 results found (can happen with Khmer or regional music videos
+    // uploaded under categories other than category 10 Music), retry without category restriction.
+    if (rawItems.length === 0 && !pageToken) {
+      try {
+        const fallbackResponse = await axios.get(`${YOUTUBE_BASE_URL}/search`, {
+          params: {
+            part: 'snippet',
+            q: query,
+            type: 'video',
+            videoEmbeddable: 'true',
+            maxResults: 16,
+            key: apiKey,
+          },
+          timeout: 10000,
+        });
+        rawItems = fallbackResponse.data?.items || [];
+      } catch (fallbackErr) {
+        console.warn('Fallback search warning:', fallbackErr.message);
+      }
+    }
 
     if (rawItems.length === 0) {
       return {

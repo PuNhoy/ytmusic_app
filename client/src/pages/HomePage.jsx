@@ -15,13 +15,16 @@ import {
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const POPULAR_SUGGESTIONS = [
-  'វណ្ណដា (VannDa)',
-  'ព្រាប សុវត្ថិ',
-  'ខេម (Khem)',
-  'Lofi Hip Hop Chill',
-  'Synthwave 80s Retro',
-  'Acoustic Pop',
-  'Deep House Chillout',
+  '🇰🇭 វណ្ណដា (VannDa)',
+  '🇰🇭 ព្រាប សុវត្ថិ',
+  '🇰🇭 ខេម (Khem)',
+  '🇰🇭 ថេណា (Tena)',
+  '🇺🇸 Shape of You',
+  '🇺🇸 Taylor Swift',
+  '🇺🇸 Alan Walker',
+  '🇺🇸 Coldplay',
+  '🎧 Lofi Hip Hop Beats',
+  '✨ Synthwave 80s',
 ];
 
 export default function HomePage() {
@@ -228,15 +231,18 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2.5 max-w-2xl mx-auto px-2">
-            {POPULAR_SUGGESTIONS.map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => handleSearchSubmit(suggestion)}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/40 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-all shadow-sm active:scale-95"
-              >
-                {suggestion}
-              </button>
-            ))}
+            {POPULAR_SUGGESTIONS.map((suggestion) => {
+              const cleanSearchTerm = suggestion.replace(/^[^\w\s\u1780-\u17FF]+/, '').trim();
+              return (
+                <button
+                  key={suggestion}
+                  onClick={() => handleSearchSubmit(cleanSearchTerm)}
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-brand-500/40 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-all shadow-sm active:scale-95"
+                >
+                  {suggestion}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
