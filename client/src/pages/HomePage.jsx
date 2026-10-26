@@ -15,12 +15,13 @@ import {
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const POPULAR_SUGGESTIONS = [
+  'វណ្ណដា (VannDa)',
+  'ព្រាប សុវត្ថិ',
+  'ខេម (Khem)',
   'Lofi Hip Hop Chill',
   'Synthwave 80s Retro',
   'Acoustic Pop',
   'Deep House Chillout',
-  'Rock Classics',
-  'Ambient Study Beats',
 ];
 
 export default function HomePage() {
