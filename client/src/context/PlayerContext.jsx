@@ -27,6 +27,8 @@ export function PlayerProvider({ children }) {
 
   const playerRef = useRef(null);
   const isSeekingRef = useRef(false);
+  const consecutiveErrorsRef = useRef(0);
+  const skipTimerRef = useRef(null);
 
   // Mutable refs to prevent stale closure or unnecessary re-binding in callbacks
   const isPlayingRef = useRef(isPlaying);
@@ -38,10 +40,22 @@ export function PlayerProvider({ children }) {
   const isMutedRef = useRef(isMuted);
   isMutedRef.current = isMuted;
 
+  const dismissError = useCallback(() => {
+    if (skipTimerRef.current) {
+      clearTimeout(skipTimerRef.current);
+      skipTimerRef.current = null;
+    }
+    setPlayerError(null);
+  }, []);
+
   // Play a specific song, optionally setting or updating the playback queue
   const playSong = useCallback((song, newQueue = null, index = null) => {
     if (!song?.videoId) return;
 
+    if (skipTimerRef.current) {
+      clearTimeout(skipTimerRef.current);
+      skipTimerRef.current = null;
+    }
     setPlayerError(null);
     setCurrentTime(0);
 
@@ -327,6 +341,8 @@ export function PlayerProvider({ children }) {
       if (state === 1) {
         setIsPlaying(true);
         setIsBuffering(false);
+        consecutiveErrorsRef.current = 0; // Reset error streak upon successful playback
+        setPlayerError(null);
         try {
           const dur = event.target.getDuration?.() || 0;
           if (dur > 0) setDuration(dur);
@@ -349,25 +365,47 @@ export function PlayerProvider({ children }) {
       const errorCode = event.data;
       console.warn(`YouTube Player Error: ${errorCode}`);
 
-      let message = 'Unable to play this track.';
-      if (errorCode === 101 || errorCode === 150) {
-        message = 'The owner does not allow this song to be embedded. Skipping to next song...';
-      } else if (errorCode === 100) {
-        message = 'Song not found or has been removed. Skipping to next song...';
-      } else if (errorCode === 2) {
-        message = 'Invalid video ID parameter. Skipping to next song...';
+      if (skipTimerRef.current) {
+        clearTimeout(skipTimerRef.current);
+        skipTimerRef.current = null;
       }
 
-      setPlayerError(message);
+      consecutiveErrorsRef.current += 1;
       setIsBuffering(false);
 
-      const timer = setTimeout(() => {
-        playNext();
-      }, 1800);
+      let reason = 'The owner does not allow this song to be played in embedded players.';
+      if (errorCode === 100) {
+        reason = 'Song not found or has been removed from YouTube.';
+      } else if (errorCode === 2) {
+        reason = 'Invalid video ID parameter.';
+      }
 
-      return () => clearTimeout(timer);
+      // If multiple consecutive tracks fail, stop auto-skipping to avoid infinite skip storm
+      if (consecutiveErrorsRef.current >= 3) {
+        setIsPlaying(false);
+        setPlayerError({
+          message: `${reason} Playback paused.`,
+          canOpenExternal: true,
+          videoId: currentSong?.videoId,
+          title: currentSong?.title,
+          isLoopBlocked: true,
+        });
+        return;
+      }
+
+      setPlayerError({
+        message: `${reason} Skipping to next track in 2s...`,
+        canOpenExternal: true,
+        videoId: currentSong?.videoId,
+        title: currentSong?.title,
+        isLoopBlocked: false,
+      });
+
+      skipTimerRef.current = setTimeout(() => {
+        playNext();
+      }, 2000);
     },
-    [playNext]
+    [currentSong, playNext]
   );
 
   return (
@@ -384,6 +422,7 @@ export function PlayerProvider({ children }) {
         isShuffle,
         repeatMode,
         playerError,
+        dismissError,
         isBuffering,
         showVideoModal,
         setShowVideoModal,

@@ -128,12 +128,12 @@ export async function searchMusic({ query, pageToken }) {
       .map((item) => item.id?.videoId)
       .filter((id) => Boolean(id));
 
-    // 2. Fetch video details (contentDetails for duration, plus high-res snippet info)
+    // 2. Fetch video details (contentDetails for duration, snippet info, and embed status)
     let detailsMap = new Map();
     if (videoIds.length > 0) {
       const videosResponse = await axios.get(`${YOUTUBE_BASE_URL}/videos`, {
         params: {
-          part: 'contentDetails,snippet',
+          part: 'contentDetails,snippet,status',
           id: videoIds.join(','),
           key: apiKey,
         },
@@ -155,6 +155,12 @@ export async function searchMusic({ query, pageToken }) {
         const detail = detailsMap.get(videoId);
         const snippet = detail?.snippet || item.snippet || {};
         const contentDetails = detail?.contentDetails || {};
+        const status = detail?.status || {};
+
+        // Exclude videos where the owner has disabled third-party embedding
+        if (status.embeddable === false) {
+          return null;
+        }
 
         const durationInfo = parseDuration(contentDetails.duration);
 
